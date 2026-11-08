@@ -31,6 +31,7 @@ small{color:#876b7b}
 </header>
 
 <main>
+
 <div class="card">
 <h2>📦 Cadastrar produto</h2>
 <input id="nome" placeholder="Nome do produto">
@@ -58,6 +59,17 @@ small{color:#876b7b}
 </div>
 
 <div class="card">
+<h2>💾 Backup e restauração</h2>
+<p>Salve seus produtos, vendas e fotos em um arquivo.</p>
+<button onclick="fazerBackup()">📥 Fazer backup</button>
+<button class="secondary" onclick="document.getElementById('arquivoBackup').click()">
+📤 Restaurar backup
+</button>
+<input id="arquivoBackup" type="file" accept=".json,application/json" style="display:none" onchange="restaurarBackup(event)">
+<small>Guarde o arquivo de backup em um local seguro.</small>
+</div>
+
+<div class="card">
 <h2>📋 Meu estoque</h2>
 <div id="lista"></div>
 </div>
@@ -66,6 +78,7 @@ small{color:#876b7b}
 <h2>🧾 Histórico de vendas</h2>
 <div id="historico"></div>
 </div>
+
 </main>
 
 <script>
@@ -77,9 +90,13 @@ return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 }
 
 function salvar(){
+try{
 localStorage.setItem("gm_produtos",JSON.stringify(produtos));
 localStorage.setItem("gm_vendas",JSON.stringify(vendas));
 mostrar();
+}catch(e){
+alert("Não foi possível salvar. O armazenamento do celular pode estar cheio.");
+}
 }
 
 function adicionar(){
@@ -166,6 +183,111 @@ data:new Date().toLocaleString("pt-BR")
 
 salvar();
 alert("Venda registrada!");
+}
+
+function fazerBackup(){
+try{
+let dados={
+app:"Giovana Make",
+versao:1,
+dataBackup:new Date().toISOString(),
+produtos:produtos,
+vendas:vendas
+};
+
+let arquivo=new Blob(
+[JSON.stringify(dados,null,2)],
+{type:"application/json"}
+);
+
+let url=URL.createObjectURL(arquivo);
+let link=document.createElement("a");
+
+link.href=url;
+link.download="backup-giovana-make-"+new Date().toISOString().slice(0,10)+".json";
+
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+
+URL.revokeObjectURL(url);
+
+alert("Backup criado! Guarde o arquivo em um local seguro.");
+}catch(e){
+alert("Não foi possível criar o backup.");
+}
+}
+
+function restaurarBackup(event){
+let arquivo=event.target.files[0];
+
+if(!arquivo)return;
+
+let leitor=new FileReader();
+
+leitor.onerror=function(){
+alert("Não foi possível ler o arquivo.");
+event.target.value="";
+};
+
+leitor.onload=function(){
+try{
+let dados=JSON.parse(leitor.result);
+
+if(
+dados.app!=="Giovana Make"||
+dados.versao!==1||
+!Array.isArray(dados.produtos)||
+!Array.isArray(dados.vendas)
+){
+throw new Error("Arquivo inválido");
+}
+
+let confirmar=confirm(
+"Restaurar este backup vai substituir os produtos e vendas deste celular. Deseja continuar?"
+);
+
+if(!confirmar){
+event.target.value="";
+return;
+}
+
+let produtosAntigos=localStorage.getItem("gm_produtos");
+let vendasAntigas=localStorage.getItem("gm_vendas");
+
+try{
+localStorage.setItem("gm_produtos",JSON.stringify(dados.produtos));
+localStorage.setItem("gm_vendas",JSON.stringify(dados.vendas));
+}catch(e){
+if(produtosAntigos===null){
+localStorage.removeItem("gm_produtos");
+}else{
+localStorage.setItem("gm_produtos",produtosAntigos);
+}
+
+if(vendasAntigas===null){
+localStorage.removeItem("gm_vendas");
+}else{
+localStorage.setItem("gm_vendas",vendasAntigas);
+}
+
+throw new Error("Não há espaço suficiente para restaurar");
+}
+
+produtos=dados.produtos;
+vendas=dados.vendas;
+
+mostrar();
+alert("Backup restaurado com sucesso! 💗");
+
+}catch(e){
+alert("Não foi possível restaurar. Verifique se o arquivo é um backup válido da Giovana Make e se há espaço no celular.");
+}
+
+event.target.value="";
+};
+
+leitor.readAsText(arquivo);
 }
 
 function mostrar(){
