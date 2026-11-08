@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="110" fill="#fff5f9"/>
+  <circle cx="256" cy="256" r="205" fill="#e879a9"/>
+  <circle cx="256" cy="256" r="175" fill="none" stroke="#f8d98b" stroke-width="8"/>
+  <text x="256" y="285" text-anchor="middle" font-family="Georgia,serif" font-size="150" font-weight="bold" fill="#ffffff">G</text>
+  <text x="256" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="42" font-weight="bold" fill="#f8e3ad">MAKE</text>
+</svg>
