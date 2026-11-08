@@ -1,0 +1,12 @@
+
+{
+  "name": "Giovana Make",
+  "short_name": "Giovana",
+  "description": "Controle de estoque e vendas da Giovana Make",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff5f9",
+  "theme_color": "#e879a9",
+  "orientation": "portrait"
+}
