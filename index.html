@@ -18,16 +18,21 @@ main{padding:15px;max-width:650px;margin:auto}
 input,button,select{width:100%;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #e5c4d3;font-size:16px}
 button{background:#e879a9;color:white;border:0;font-weight:bold}
 button.secondary{background:#95627c}
+button.danger{background:#bd526e}
 .item{border-bottom:1px solid #eee;padding:12px 0}
 small{color:#876b7b}
-.foto-produto{width:100px;height:100px;object-fit:cover;border-radius:10px;margin-bottom:8px}
+.foto-produto{width:100px;height:100px;object-fit:cover;border-radius:10px;margin:6px 0}
+.alerta{background:#fff0c9;padding:10px;border-radius:8px;margin:8px 0;color:#76521b}
+.sucesso{background:#e8f7e9;padding:10px;border-radius:8px;margin:8px 0;color:#286333}
+.resultado{background:#fff5f9;padding:12px;border-radius:8px;margin-top:8px}
+video{width:100%;border-radius:10px;background:#222;margin-top:8px}
 </style>
 </head>
 
 <body>
 <header>
 <h1>Giovana Make 💗</h1>
-<p>Controle de estoque e vendas</p>
+<p>Controle de estoque, vendas e lucros</p>
 </header>
 
 <main>
@@ -35,12 +40,32 @@ small{color:#876b7b}
 <div class="card">
 <h2>📦 Cadastrar produto</h2>
 <input id="nome" placeholder="Nome do produto">
+<select id="categoria">
+<option value="Maquiagem">Maquiagem</option>
+<option value="Skincare">Skincare</option>
+<option value="Acessórios">Acessórios</option>
+<option value="Variedades">Variedades</option>
+</select>
+<input id="codigoBarras" placeholder="Código de barras (opcional)">
 <input id="custo" type="number" step="0.01" min="0" placeholder="Preço de custo">
 <input id="preco" type="number" step="0.01" min="0.01" placeholder="Preço de venda">
 <input id="qtd" type="number" step="1" min="0" placeholder="Quantidade em estoque">
 <label for="foto">📸 Foto do produto</label>
 <input id="foto" type="file" accept="image/*" capture="environment">
 <button onclick="adicionar()">Cadastrar produto</button>
+</div>
+
+<div class="card">
+<h2>🔎 Localizar produto</h2>
+<input id="buscarCodigo" placeholder="Digite ou escaneie o código de barras">
+<button onclick="buscarPorCodigo()">Pesquisar código</button>
+<button class="secondary" onclick="iniciarLeitor()">📷 Ler código pela câmera</button>
+<div id="areaCamera" style="display:none">
+<video id="videoCamera" autoplay playsinline></video>
+<p id="statusCamera"><small>Aponte a câmera para o código de barras.</small></p>
+<button class="danger" onclick="pararLeitor()">Fechar câmera</button>
+</div>
+<div id="resultadoBusca"></div>
 </div>
 
 <div class="card">
@@ -56,21 +81,46 @@ small{color:#876b7b}
 <p>Itens em estoque: <b id="estoque">0</b></p>
 <p>Vendas realizadas: <b id="vendas">0</b></p>
 <p>Faturamento: <b id="faturamento">R$ 0,00</b></p>
+<p>Lucro das vendas: <b id="lucro">R$ 0,00</b></p>
+<p>Despesas: <b id="totalDespesas">R$ 0,00</b></p>
+<p>Resultado após despesas: <b id="resultadoFinal">R$ 0,00</b></p>
+<small>O lucro considera somente vendas novas, registradas com custo do produto.</small>
+</div>
+
+<div class="card">
+<h2>💸 Registrar despesa</h2>
+<input id="despesaNome" placeholder="Descrição da despesa">
+<input id="despesaValor" type="number" min="0.01" step="0.01" placeholder="Valor da despesa">
+<button onclick="adicionarDespesa()">Salvar despesa</button>
+<h3>Histórico de despesas</h3>
+<div id="historicoDespesas"></div>
+</div>
+
+<div class="card">
+<h2>⚠️ Estoque baixo</h2>
+<p><small>O aplicativo avisa quando restarem 3 unidades ou menos.</small></p>
+<div id="alertasEstoque"></div>
 </div>
 
 <div class="card">
 <h2>💾 Backup e restauração</h2>
-<p>Salve seus produtos, vendas e fotos em um arquivo.</p>
+<p>Salve seus produtos, vendas, fotos e despesas em um arquivo.</p>
 <button onclick="fazerBackup()">📥 Fazer backup</button>
-<button class="secondary" onclick="document.getElementById('arquivoBackup').click()">
-📤 Restaurar backup
-</button>
+<button class="secondary" onclick="document.getElementById('arquivoBackup').click()">📤 Restaurar backup</button>
 <input id="arquivoBackup" type="file" accept=".json,application/json" style="display:none" onchange="restaurarBackup(event)">
-<small>Guarde o arquivo de backup em um local seguro.</small>
+<small>Guarde seu arquivo de backup em um local seguro.</small>
 </div>
 
 <div class="card">
 <h2>📋 Meu estoque</h2>
+<select id="filtroCategoria" onchange="mostrar()">
+<option value="">Todas as categorias</option>
+<option value="Maquiagem">Maquiagem</option>
+<option value="Skincare">Skincare</option>
+<option value="Acessórios">Acessórios</option>
+<option value="Variedades">Variedades</option>
+<option value="Sem categoria">Sem categoria</option>
+</select>
 <div id="lista"></div>
 </div>
 
@@ -84,88 +134,88 @@ small{color:#876b7b}
 <script>
 let produtos=JSON.parse(localStorage.getItem("gm_produtos")||"[]");
 let vendas=JSON.parse(localStorage.getItem("gm_vendas")||"[]");
+let despesas=JSON.parse(localStorage.getItem("gm_despesas")||"[]");
 
 function dinheiro(v){
-return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+}
+
+function escapar(v){
+return String(v??"").replace(/[&<>"']/g,function(c){
+return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+});
 }
 
 function salvar(){
 try{
 localStorage.setItem("gm_produtos",JSON.stringify(produtos));
 localStorage.setItem("gm_vendas",JSON.stringify(vendas));
+localStorage.setItem("gm_despesas",JSON.stringify(despesas));
 mostrar();
 }catch(e){
 alert("Não foi possível salvar. O armazenamento do celular pode estar cheio.");
 }
 }
 
+function comprimirFoto(arquivo,callback){
+if(!arquivo)return callback("");
+if(!arquivo.type.startsWith("image/")){
+alert("Escolha um arquivo de imagem.");
+return;
+}
+let leitor=new FileReader();
+leitor.onerror=()=>alert("Não foi possível ler a foto.");
+leitor.onload=function(){
+let imagem=new Image();
+imagem.onerror=()=>alert("Não foi possível abrir essa imagem.");
+imagem.onload=function(){
+let canvas=document.createElement("canvas");
+let escala=Math.min(1,500/Math.max(imagem.width,imagem.height));
+canvas.width=Math.max(1,Math.round(imagem.width*escala));
+canvas.height=Math.max(1,Math.round(imagem.height*escala));
+canvas.getContext("2d").drawImage(imagem,0,0,canvas.width,canvas.height);
+callback(canvas.toDataURL("image/jpeg",0.7));
+};
+imagem.src=leitor.result;
+};
+leitor.readAsDataURL(arquivo);
+}
+
 function adicionar(){
 let nome=document.getElementById("nome").value.trim();
+let categoria=document.getElementById("categoria").value;
+let codigo=document.getElementById("codigoBarras").value.trim();
 let custo=Number(document.getElementById("custo").value);
 let preco=Number(document.getElementById("preco").value);
 let qtd=Number(document.getElementById("qtd").value);
 let arquivo=document.getElementById("foto").files[0];
 
-if(!nome||preco<=0||qtd<0||!Number.isInteger(qtd)||custo<0){
+if(!nome||!Number.isFinite(custo)||custo<0||!Number.isFinite(preco)||preco<=0||!Number.isInteger(qtd)||qtd<0){
 alert("Preencha nome, custo, preço e quantidade corretamente.");
 return;
 }
+if(codigo&&produtos.some(p=>String(p.codigoBarras||"")===codigo)){
+alert("Esse código de barras já está cadastrado em outro produto.");
+return;
+}
 
-function salvarProduto(foto=""){
-produtos.push({id:Date.now(),nome,custo,preco,qtd,foto});
+comprimirFoto(arquivo,function(foto){
+produtos.push({id:Date.now(),nome,categoria,codigoBarras:codigo,custo,preco,qtd,foto});
 document.getElementById("nome").value="";
+document.getElementById("codigoBarras").value="";
 document.getElementById("custo").value="";
 document.getElementById("preco").value="";
 document.getElementById("qtd").value="";
 document.getElementById("foto").value="";
 salvar();
-alert("Produto cadastrado!");
-}
-
-if(arquivo){
-if(!arquivo.type.startsWith("image/")){
-alert("Escolha um arquivo de imagem.");
-return;
-}
-
-let leitor=new FileReader();
-
-leitor.onerror=function(){
-alert("Não foi possível ler a foto.");
-};
-
-leitor.onload=function(){
-let imagem=new Image();
-
-imagem.onerror=function(){
-alert("Não foi possível abrir essa imagem.");
-};
-
-imagem.onload=function(){
-let canvas=document.createElement("canvas");
-let escala=Math.min(1,500/Math.max(imagem.width,imagem.height));
-
-canvas.width=Math.max(1,Math.round(imagem.width*escala));
-canvas.height=Math.max(1,Math.round(imagem.height*escala));
-
-canvas.getContext("2d").drawImage(imagem,0,0,canvas.width,canvas.height);
-
-salvarProduto(canvas.toDataURL("image/jpeg",0.7));
-};
-
-imagem.src=leitor.result;
-};
-
-leitor.readAsDataURL(arquivo);
-}else{
-salvarProduto("");
-}
+alert("Produto cadastrado com sucesso! 💗");
+});
 }
 
 function vender(){
 let id=Number(document.getElementById("produto").value);
 let qtd=Number(document.getElementById("vendaQtd").value);
-let p=produtos.find(x=>x.id===id);
+let p=produtos.find(x=>Number(x.id)===id);
 
 if(!p||!Number.isInteger(qtd)||qtd<1||qtd>p.qtd){
 alert("Confira o produto e a quantidade disponível.");
@@ -173,46 +223,201 @@ return;
 }
 
 p.qtd-=qtd;
-
 vendas.unshift({
 nome:p.nome,
-qtd,
-valor:p.preco*qtd,
+qtd:qtd,
+valor:Number(p.preco)*qtd,
+custoUnitario:Number(p.custo),
+lucro:(Number(p.preco)-Number(p.custo))*qtd,
 data:new Date().toLocaleString("pt-BR")
 });
-
 salvar();
-alert("Venda registrada!");
+alert("Venda registrada! 💗");
+}
+
+function adicionarDespesa(){
+let nome=document.getElementById("despesaNome").value.trim();
+let valor=Number(document.getElementById("despesaValor").value);
+if(!nome||!Number.isFinite(valor)||valor<=0){
+alert("Informe a descrição e um valor válido.");
+return;
+}
+despesas.unshift({
+id:Date.now(),
+nome:nome,
+valor:valor,
+data:new Date().toLocaleString("pt-BR")
+});
+document.getElementById("despesaNome").value="";
+document.getElementById("despesaValor").value="";
+salvar();
+alert("Despesa registrada!");
+}
+
+function excluirDespesa(id){
+if(!confirm("Deseja excluir esta despesa?"))return;
+despesas=despesas.filter(d=>Number(d.id)!==Number(id));
+salvar();
+}
+
+function alterar(id){
+let p=produtos.find(x=>Number(x.id)===Number(id));
+if(!p)return;
+
+let nome=prompt("Nome do produto:",p.nome);
+if(nome===null)return;
+nome=nome.trim();
+if(!nome){alert("O nome não pode ficar vazio.");return;}
+
+let categoria=prompt("Categoria: Maquiagem, Skincare, Acessórios ou Variedades",p.categoria||"Variedades");
+if(categoria===null)return;
+let categorias=["Maquiagem","Skincare","Acessórios","Variedades"];
+categoria=categorias.find(c=>c.toLowerCase()===categoria.trim().toLowerCase());
+if(!categoria){alert("Categoria inválida.");return;}
+
+let codigo=prompt("Código de barras:",p.codigoBarras||"");
+if(codigo===null)return;
+codigo=codigo.trim();
+if(codigo&&produtos.some(x=>Number(x.id)!==Number(id)&&String(x.codigoBarras||"")===codigo)){
+alert("Esse código já pertence a outro produto.");return;
+}
+
+let custo=prompt("Preço de custo:",p.custo);
+if(custo===null)return;
+let preco=prompt("Preço de venda:",p.preco);
+if(preco===null)return;
+let qtd=prompt("Quantidade em estoque:",p.qtd);
+if(qtd===null)return;
+
+custo=Number(custo.replace(",","."));
+preco=Number(preco.replace(",","."));
+qtd=Number(qtd);
+
+if(!Number.isFinite(custo)||custo<0||!Number.isFinite(preco)||preco<=0||!Number.isInteger(qtd)||qtd<0){
+alert("Confira os valores informados.");return;
+}
+
+p.nome=nome;
+p.categoria=categoria;
+p.codigoBarras=codigo;
+p.custo=custo;
+p.preco=preco;
+p.qtd=qtd;
+salvar();
+alert("Produto atualizado!");
+}
+
+function alterarFoto(id){
+let p=produtos.find(x=>Number(x.id)===Number(id));
+if(!p)return;
+let campo=document.getElementById("fotoEdicao");
+campo.dataset.id=id;
+campo.value="";
+campo.click();
+}
+
+function salvarFotoEdicao(event){
+let arquivo=event.target.files[0];
+let id=Number(event.target.dataset.id);
+let p=produtos.find(x=>Number(x.id)===id);
+if(!arquivo||!p)return;
+comprimirFoto(arquivo,function(foto){
+if(foto){p.foto=foto;salvar();alert("Foto atualizada!");}
+});
+event.target.value="";
+}
+
+function buscarPorCodigo(){
+let codigo=document.getElementById("buscarCodigo").value.trim();
+let area=document.getElementById("resultadoBusca");
+if(!codigo){area.innerHTML="<p>Digite um código para pesquisar.</p>";return;}
+let p=produtos.find(x=>String(x.codigoBarras||"")===codigo);
+if(!p){
+area.innerHTML='<div class="alerta">Nenhum produto encontrado com esse código.</div>';
+return;
+}
+area.innerHTML='<div class="resultado"><b>'+escapar(p.nome)+'</b><br>'+
+'Categoria: '+escapar(p.categoria||"Sem categoria")+'<br>'+
+'Estoque: '+p.qtd+' unidade(s)<br>'+
+'Preço: '+dinheiro(p.preco)+'</div>';
+}
+
+let fluxoCamera=null;
+let detector=null;
+let cameraAtiva=false;
+
+async function iniciarLeitor(){
+if(!("BarcodeDetector" in window)){
+alert("Seu navegador não oferece leitura de código de barras pela câmera. Você pode digitar o código no campo de pesquisa.");
+return;
+}
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+alert("A câmera não está disponível neste navegador. Digite o código manualmente.");
+return;
+}
+try{
+detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","codabar"]});
+fluxoCamera=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+let video=document.getElementById("videoCamera");
+video.srcObject=fluxoCamera;
+document.getElementById("areaCamera").style.display="block";
+cameraAtiva=true;
+await video.play();
+lerQuadro();
+}catch(e){
+pararLeitor();
+alert("Não foi possível abrir a câmera. Verifique a permissão do navegador.");
+}
+}
+
+async function lerQuadro(){
+if(!cameraAtiva)return;
+let video=document.getElementById("videoCamera");
+try{
+if(video.readyState>=2){
+let codigos=await detector.detect(video);
+if(codigos.length){
+document.getElementById("buscarCodigo").value=codigos[0].rawValue;
+pararLeitor();
+buscarPorCodigo();
+return;
+}
+}
+}catch(e){}
+if(cameraAtiva)setTimeout(lerQuadro,250);
+}
+
+function pararLeitor(){
+cameraAtiva=false;
+if(fluxoCamera){
+fluxoCamera.getTracks().forEach(t=>t.stop());
+fluxoCamera=null;
+}
+let video=document.getElementById("videoCamera");
+if(video)video.srcObject=null;
+document.getElementById("areaCamera").style.display="none";
 }
 
 function fazerBackup(){
 try{
 let dados={
 app:"Giovana Make",
-versao:1,
+versao:2,
 dataBackup:new Date().toISOString(),
 produtos:produtos,
-vendas:vendas
+vendas:vendas,
+despesas:despesas
 };
-
-let arquivo=new Blob(
-[JSON.stringify(dados,null,2)],
-{type:"application/json"}
-);
-
+let arquivo=new Blob([JSON.stringify(dados,null,2)],{type:"application/json"});
 let url=URL.createObjectURL(arquivo);
 let link=document.createElement("a");
-
 link.href=url;
 link.download="backup-giovana-make-"+new Date().toISOString().slice(0,10)+".json";
-
 document.body.appendChild(link);
 link.click();
 document.body.removeChild(link);
-
-URL.revokeObjectURL(url);
-
-alert("Backup criado! Guarde o arquivo em um local seguro.");
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+alert("Backup criado! Guarde o arquivo em um local seguro. 💗");
 }catch(e){
 alert("Não foi possível criar o backup.");
 }
@@ -220,9 +425,7 @@ alert("Não foi possível criar o backup.");
 
 function restaurarBackup(event){
 let arquivo=event.target.files[0];
-
 if(!arquivo)return;
-
 let leitor=new FileReader();
 
 leitor.onerror=function(){
@@ -233,108 +436,113 @@ event.target.value="";
 leitor.onload=function(){
 try{
 let dados=JSON.parse(leitor.result);
-
 if(
 dados.app!=="Giovana Make"||
-dados.versao!==1||
+![1,2].includes(dados.versao)||
 !Array.isArray(dados.produtos)||
-!Array.isArray(dados.vendas)
+!Array.isArray(dados.vendas)||
+(dados.versao===2&&!Array.isArray(dados.despesas))
 ){
 throw new Error("Arquivo inválido");
 }
 
-let confirmar=confirm(
-"Restaurar este backup vai substituir os produtos e vendas deste celular. Deseja continuar?"
-);
-
-if(!confirmar){
+if(!confirm("Restaurar este backup vai substituir os produtos, vendas e despesas deste celular. Deseja continuar?")){
 event.target.value="";
 return;
 }
 
-let produtosAntigos=localStorage.getItem("gm_produtos");
-let vendasAntigas=localStorage.getItem("gm_vendas");
+let chaves=["gm_produtos","gm_vendas","gm_despesas"];
+let antigos={};
+chaves.forEach(k=>antigos[k]=localStorage.getItem(k));
 
 try{
 localStorage.setItem("gm_produtos",JSON.stringify(dados.produtos));
 localStorage.setItem("gm_vendas",JSON.stringify(dados.vendas));
+localStorage.setItem("gm_despesas",JSON.stringify(dados.despesas||[]));
 }catch(e){
-if(produtosAntigos===null){
-localStorage.removeItem("gm_produtos");
-}else{
-localStorage.setItem("gm_produtos",produtosAntigos);
-}
-
-if(vendasAntigas===null){
-localStorage.removeItem("gm_vendas");
-}else{
-localStorage.setItem("gm_vendas",vendasAntigas);
-}
-
-throw new Error("Não há espaço suficiente para restaurar");
+chaves.forEach(k=>{
+if(antigos[k]===null)localStorage.removeItem(k);
+else localStorage.setItem(k,antigos[k]);
+});
+throw new Error("Sem espaço para restaurar");
 }
 
 produtos=dados.produtos;
 vendas=dados.vendas;
-
+despesas=dados.despesas||[];
 mostrar();
 alert("Backup restaurado com sucesso! 💗");
-
 }catch(e){
-alert("Não foi possível restaurar. Verifique se o arquivo é um backup válido da Giovana Make e se há espaço no celular.");
+alert("Não foi possível restaurar. Verifique se o arquivo é um backup válido e se há espaço no celular.");
 }
-
 event.target.value="";
 };
-
 leitor.readAsText(arquivo);
 }
 
 function mostrar(){
 let total=produtos.reduce((s,p)=>s+Number(p.qtd||0),0);
 let faturamento=vendas.reduce((s,v)=>s+Number(v.valor||0),0);
+let vendasComCusto=vendas.filter(v=>Number.isFinite(Number(v.custoUnitario))&&v.custoUnitario!==null&&v.custoUnitario!==undefined);
+let lucro=vendasComCusto.reduce((s,v)=>s+(Number.isFinite(Number(v.lucro))?Number(v.lucro):(Number(v.valor||0)-Number(v.custoUnitario)*Number(v.qtd||0))),0);
+let totalGastos=despesas.reduce((s,d)=>s+Number(d.valor||0),0);
 
 document.getElementById("total").textContent=produtos.length;
 document.getElementById("estoque").textContent=total;
 document.getElementById("vendas").textContent=vendas.length;
 document.getElementById("faturamento").textContent=dinheiro(faturamento);
+document.getElementById("lucro").textContent=dinheiro(lucro);
+document.getElementById("totalDespesas").textContent=dinheiro(totalGastos);
+document.getElementById("resultadoFinal").textContent=dinheiro(lucro-totalGastos);
 
 document.getElementById("produto").innerHTML=produtos
-.filter(p=>p.qtd>0)
-.map(p=>`<option value="${p.id}">${p.nome} — ${p.qtd} disponíveis</option>`)
+.filter(p=>Number(p.qtd)>0)
+.map(p=>'<option value="'+Number(p.id)+'">'+escapar(p.nome)+' — '+p.qtd+' disponíveis</option>')
 .join("");
 
-document.getElementById("lista").innerHTML=produtos.map(p=>
-`<div class="item">
-${p.foto?`<img class="foto-produto" src="${p.foto}" alt="Foto de ${p.nome}"><br>`:""}
-<b>${p.nome}</b><br>
-<small>Custo: ${dinheiro(p.custo)} | Venda: ${dinheiro(p.preco)} | Estoque: ${p.qtd}</small><br>
-<button class="secondary" onclick="alterar(${p.id})">Alterar estoque</button>
-</div>`
-).join("")||"Nenhum produto cadastrado.";
+let filtro=document.getElementById("filtroCategoria").value;
+let produtosFiltrados=produtos.filter(p=>{
+let cat=p.categoria||"Sem categoria";
+return !filtro||cat===filtro;
+});
+
+document.getElementById("lista").innerHTML=produtosFiltrados.map(p=>
+'<div class="item">'+
+(p.foto?'<img class="foto-produto" src="'+p.foto+'" alt="Foto do produto"><br>':"")+
+'<b>'+escapar(p.nome)+'</b><br>'+
+'<small>Categoria: '+escapar(p.categoria||"Sem categoria")+
+' | Código: '+escapar(p.codigoBarras||"Não cadastrado")+'<br>'+
+'Custo: '+dinheiro(p.custo)+' | Venda: '+dinheiro(p.preco)+
+' | Estoque: '+p.qtd+'</small><br>'+
+'<button class="secondary" onclick="alterar('+Number(p.id)+')">✏️ Editar produto</button>'+
+'<button class="secondary" onclick="alterarFoto('+Number(p.id)+')">📸 Alterar foto</button>'+
+'</div>'
+).join("")||"Nenhum produto cadastrado nesta categoria.";
+
+let baixos=produtos.filter(p=>Number(p.qtd)<=3);
+document.getElementById("alertasEstoque").innerHTML=baixos.map(p=>
+'<div class="alerta"><b>'+escapar(p.nome)+'</b>: restam '+p.qtd+' unidade(s).</div>'
+).join("")||'<div class="sucesso">Todos os produtos estão com estoque acima de 3 unidades. 💗</div>';
 
 document.getElementById("historico").innerHTML=vendas.map(v=>
-`<div class="item">
-${v.nome} — ${v.qtd} unidade(s)<br>
-<b>${dinheiro(v.valor)}</b><br>
-<small>${v.data}</small>
-</div>`
+'<div class="item">'+
+'<b>'+escapar(v.nome)+'</b> — '+v.qtd+' unidade(s)<br>'+
+'Valor: <b>'+dinheiro(v.valor)+'</b><br>'+
+(v.custoUnitario!==undefined&&v.custoUnitario!==null?'Lucro: '+dinheiro(v.lucro):'<small>Venda antiga: custo não registrado</small><br>')+
+'<small>'+escapar(v.data||"")+'</small>'+
+'</div>'
 ).join("")||"Nenhuma venda registrada.";
+
+document.getElementById("historicoDespesas").innerHTML=despesas.map(d=>
+'<div class="item">'+
+'<b>'+escapar(d.nome)+'</b><br>'+
+dinheiro(d.valor)+'<br><small>'+escapar(d.data||"")+'</small>'+
+'<button class="danger" onclick="excluirDespesa('+Number(d.id)+')">Excluir despesa</button>'+
+'</div>'
+).join("")||"Nenhuma despesa registrada.";
 }
 
-function alterar(id){
-let p=produtos.find(x=>x.id===id);
-if(!p)return;
-
-let n=prompt("Digite a nova quantidade em estoque:",p.qtd);
-
-if(n!==null&&n.trim()!==""&&Number.isInteger(Number(n))&&Number(n)>=0){
-p.qtd=Number(n);
-salvar();
-}else if(n!==null){
-alert("Digite uma quantidade inteira igual ou maior que zero.");
-}
-}
+document.getElementById("fotoEdicao")?.addEventListener("change",salvarFotoEdicao);
 
 mostrar();
 
@@ -344,5 +552,8 @@ navigator.serviceWorker.register("./service-worker.js");
 });
 }
 </script>
+
+<input id="fotoEdicao" type="file" accept="image/*" capture="environment" style="display:none" onchange="salvarFotoEdicao(event)">
+
 </body>
 </html>
