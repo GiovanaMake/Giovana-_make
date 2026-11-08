@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#e879a9">
+<title>Giovana Make</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#fff5f9;color:#49313d;font-family:Arial,sans-serif}
+header{background:#e879a9;color:white;text-align:center;padding:22px}
+h1{margin:0}
+main{padding:15px;max-width:650px;margin:auto}
+.card{background:white;padding:16px;margin:12px 0;border-radius:14px;box-shadow:0 2px 8px #e8cbd8}
+input,button{width:100%;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #e5c4d3;font-size:16px}
+button{background:#e879a9;color:white;border:0;font-weight:bold}
+button.secondary{background:#95627c}
+.item{border-bottom:1px solid #eee;padding:12px 0}
+small{color:#876b7b}
+</style>
+</head>
+<body>
+<header>
+<h1>Giovana Make 💗</h1>
+<p>Controle de estoque e vendas</p>
+</header>
+<main>
+<div class="card">
+<h2>📦 Cadastrar produto</h2>
+<input id="nome" placeholder="Nome do produto">
+<input id="custo" type="number" step="0.01" placeholder="Preço de custo">
+<input id="preco" type="number" step="0.01" placeholder="Preço de venda">
+<input id="qtd" type="number" placeholder="Quantidade em estoque">
+<button onclick="adicionar()">Cadastrar produto</button>
+</div>
+
+<div class="card">
+<h2>🛍️ Registrar venda</h2>
+<select id="produto"></select>
+<input id="vendaQtd" type="number" min="1" value="1" placeholder="Quantidade">
+<button onclick="vender()">Registrar venda</button>
+</div>
+
+<div class="card">
+<h2>📊 Resumo</h2>
+<p>Produtos cadastrados: <b id="total">0</b></p>
+<p>Itens em estoque: <b id="estoque">0</b></p>
+<p>Vendas realizadas: <b id="vendas">0</b></p>
+<p>Faturamento: <b id="faturamento">R$ 0,00</b></p>
+</div>
+
+<div class="card">
+<h2>📋 Meu estoque</h2>
+<div id="lista"></div>
+</div>
+
+<div class="card">
+<h2>🧾 Histórico de vendas</h2>
+<div id="historico"></div>
+</div>
+</main>
+<script>
+let produtos=JSON.parse(localStorage.getItem("gm_produtos")||"[]");
+let vendas=JSON.parse(localStorage.getItem("gm_vendas")||"[]");
+function dinheiro(v){return Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}
+function salvar(){
+localStorage.setItem("gm_produtos",JSON.stringify(produtos));
+localStorage.setItem("gm_vendas",JSON.stringify(vendas));
+mostrar();
+}
+function adicionar(){
+let nome=document.getElementById("nome").value.trim();
+let custo=Number(document.getElementById("custo").value);
+let preco=Number(document.getElementById("preco").value);
+let qtd=Number(document.getElementById("qtd").value);
+if(!nome||preco<=0||qtd<0){alert("Preencha nome, preço e quantidade corretamente.");return}
+produtos.push({id:Date.now(),nome,custo,preco,qtd});
+document.getElementById("nome").value="";
+document.getElementById("custo").value="";
+document.getElementById("preco").value="";
+document.getElementById("qtd").value="";
+salvar();
+}
+function vender(){
+let id=Number(document.getElementById("produto").value);
+let qtd=Number(document.getElementById("vendaQtd").value);
+let p=produtos.find(x=>x.id===id);
+if(!p||qtd<1||qtd>p.qtd){alert("Confira o produto e a quantidade disponível.");return}
+p.qtd-=qtd;
+vendas.unshift({nome:p.nome,qtd,valor:p.preco*qtd,data:new Date().toLocaleString("pt-BR")});
+salvar();
+alert("Venda registrada!");
+}
+function mostrar(){
+let total=produtos.reduce((s,p)=>s+p.qtd,0);
+let faturamento=vendas.reduce((s,v)=>s+v.valor,0);
+document.getElementById("total").textContent=produtos.length;
+document.getElementById("estoque").textContent=total;
+document.getElementById("vendas").textContent=vendas.length;
+document.getElementById("faturamento").textContent=dinheiro(faturamento);
+document.getElementById("produto").innerHTML=produtos.map(p=>`<option value="${p.id}">${p.nome} — ${p.qtd} disponíveis</option>`).join("");
+document.getElementById("lista").innerHTML=produtos.map(p=>`<div class="item"><b>${p.nome}</b><br><small>Custo: ${dinheiro(p.custo)} | Venda: ${dinheiro(p.preco)} | Estoque: ${p.qtd}</small><br><button class="secondary" onclick="alterar(${p.id})">Alterar estoque</button></div>`).join("")||"Nenhum produto cadastrado.";
+document.getElementById("historico").innerHTML=vendas.map(v=>`<div class="item">${v.nome} — ${v.qtd} unidade(s)<br><b>${dinheiro(v.valor)}</b><br><small>${v.data}</small></div>`).join("")||"Nenhuma venda registrada.";
+}
+function alterar(id){
+let p=produtos.find(x=>x.id===id);
+let n=prompt("Digite a nova quantidade em estoque:",p.qtd);
+if(n!==null&&n.trim()!==""&&Number(n)>=0){p.qtd=Number(n);salvar()}
+}
+mostrar();
+</script>
+</body>
+</html>
