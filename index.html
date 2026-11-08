@@ -109,6 +109,11 @@ let n=prompt("Digite a nova quantidade em estoque:",p.qtd);
 if(n!==null&&n.trim()!==""&&Number(n)>=0){p.qtd=Number(n);salvar()}
 }
 mostrar();
+  if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+  }
 </script>
 </body>
 </html>
